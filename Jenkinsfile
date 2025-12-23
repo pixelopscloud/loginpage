@@ -2,6 +2,7 @@ pipeline {
     agent any
     
     environment {
+        DOCKER_HUB_REPO = 'pixelopscloud'
         BACKEND_IMAGE = 'login-backend'
         FRONTEND_IMAGE = 'login-frontend'
         IMAGE_TAG = "${BUILD_NUMBER}"
@@ -21,8 +22,8 @@ pipeline {
             steps {
                 echo 'Building Backend Docker Image...'
                 dir('backend') {
-                    sh "docker build -t ${BACKEND_IMAGE}:${IMAGE_TAG} ."
-                    sh "docker tag ${BACKEND_IMAGE}:${IMAGE_TAG} ${BACKEND_IMAGE}:latest"
+                    sh "docker build -t ${DOCKER_HUB_REPO}/${BACKEND_IMAGE}:${IMAGE_TAG} ."
+                    sh "docker tag ${DOCKER_HUB_REPO}/${BACKEND_IMAGE}:${IMAGE_TAG} ${DOCKER_HUB_REPO}/${BACKEND_IMAGE}:latest"
                 }
             }
         }
@@ -31,31 +32,29 @@ pipeline {
             steps {
                 echo 'Building Frontend Docker Image...'
                 dir('frontend') {
-                    sh "docker build -t ${FRONTEND_IMAGE}:${IMAGE_TAG} ."
-                    sh "docker tag ${FRONTEND_IMAGE}:${IMAGE_TAG} ${FRONTEND_IMAGE}:latest"
+                    sh "docker build -t ${DOCKER_HUB_REPO}/${FRONTEND_IMAGE}:${IMAGE_TAG} ."
+                    sh "docker tag ${DOCKER_HUB_REPO}/${FRONTEND_IMAGE}:${IMAGE_TAG} ${DOCKER_HUB_REPO}/${FRONTEND_IMAGE}:latest"
                 }
             }
         }
         
-        stage('List Images') {
+        stage('Push to Docker Hub') {
             steps {
-                echo 'Listing Docker Images...'
-                sh 'docker images | grep login'
-            }
-        }
-        
-        stage('Deploy Info') {
-            steps {
-                echo "Backend Image: ${BACKEND_IMAGE}:${IMAGE_TAG}"
-                echo "Frontend Image: ${FRONTEND_IMAGE}:${IMAGE_TAG}"
-                echo 'Ready for Kubernetes deployment!'
+                echo 'Pushing images to Docker Hub...'
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    sh "docker push ${DOCKER_HUB_REPO}/${BACKEND_IMAGE}:${IMAGE_TAG}"
+                    sh "docker push ${DOCKER_HUB_REPO}/${BACKEND_IMAGE}:latest"
+                    sh "docker push ${DOCKER_HUB_REPO}/${FRONTEND_IMAGE}:${IMAGE_TAG}"
+                    sh "docker push ${DOCKER_HUB_REPO}/${FRONTEND_IMAGE}:latest"
+                }
             }
         }
     }
     
     post {
         success {
-            echo '✅ Pipeline completed successfully!'
+            echo '✅ Pipeline completed! Images pushed to Docker Hub!'
         }
         failure {
             echo '❌ Pipeline failed!'
