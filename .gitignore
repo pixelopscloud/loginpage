@@ -1,0 +1,6 @@
+tignore` file mein yeh add karo:**
+```
+node_modules/
+*.log
+.DS_Store
+
